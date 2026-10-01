@@ -1,0 +1,124 @@
+name: AmazonPicks — Rodada completa diária
+
+on:
+  # O caminho deste arquivo foi preservado para o disparo externo diário das 7h
+  # (horário de Brasília). O horário é administrado no EventBridge.
+  workflow_dispatch:
+    inputs:
+      validate_only:
+        description: Validar configuração sem atualizar preços
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: amazonpicks-unified-price-refresh
+  cancel-in-progress: false
+
+jobs:
+  full-site-refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      OFFER_SELECTION_CONTROL_ENABLED: "true"
+
+    steps:
+      - name: Validar segredos obrigatórios
+        shell: bash
+        env:
+          SUPLEMENTOS_DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
+          SUPLEMENTOS_DEPLOY_KEY: ${{ secrets.SUPLEMENTOS_DEPLOY_KEY }}
+          SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
+          SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
+          SUPLEMENTOS_AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
+          SUPLEMENTOS_AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
+          SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+        run: |
+          for name in SUPLEMENTOS_DATABASE_URL SUPLEMENTOS_DEPLOY_KEY SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET SUPLEMENTOS_AMAZON_CREATORS_VERSION SUPLEMENTOS_AMAZON_PARTNER_TAG SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET; do
+            if [ -z "${!name}" ]; then echo "Configuração ausente: $name"; exit 1; fi
+          done
+          echo "Configuração validada."
+      - name: Baixar código do AmazonPicks
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: drlucashott-code/suplementos
+          ref: main
+          ssh-key: ${{ secrets.SUPLEMENTOS_DEPLOY_KEY }}
+          persist-credentials: false
+          path: suplementos
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        working-directory: suplementos
+        shell: bash
+        run: |
+          if npm ci > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
+            echo "Etapa concluída com sucesso."
+          else
+            echo "Etapa falhou. Saída omitida para proteger os dados privados."
+            exit 1
+          fi
+
+      - name: Gerar cliente Prisma
+        working-directory: suplementos
+        shell: bash
+        run: |
+          if npx prisma generate > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
+            echo "Etapa concluída com sucesso."
+          else
+            echo "Etapa falhou. Saída omitida para proteger os dados privados."
+            exit 1
+          fi
+
+      - name: Atualizar todo o universo monitorado pela Creators
+        if: ${{ !inputs.validate_only }}
+        working-directory: suplementos
+        shell: bash
+        run: |
+          if npx tsx scripts/z-UpdatePrices.ts --force --mode=full > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
+            echo "Etapa concluída com sucesso."
+          else
+            echo "Etapa falhou. Saída omitida para proteger os dados privados."
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
+          AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
+          AMAZON_REGION: us-east-1
+          AMAZON_HOST: webservices.amazon.com.br
+          AMAZON_API_PROVIDER: creators
+          AMAZON_DISABLE_PAAPI_FALLBACK: "1"
+          AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
+          AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
+          AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
+          AMAZON_GLOBAL_REQUEST_DELAY_MS: "800"
+          AMAZON_GLOBAL_DB_WRITE_CONCURRENCY: "4"
+          APP_BASE_URL: https://www.amazonpicks.com.br
+          INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          NEXT_OFFERS_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          SCHEDULER_V2_ENABLED: "false"
+          SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
+          SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
+
+      - name: Recalcular médias e limpar retenção
+        if: ${{ !inputs.validate_only }}
+        working-directory: suplementos
+        shell: bash
+        run: |
+          if npm run refresh:dynamic:price-stats > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
+            echo "Etapa concluída com sucesso."
+          else
+            echo "Etapa falhou. Saída omitida para proteger os dados privados."
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
+          APP_BASE_URL: https://www.amazonpicks.com.br
+          INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          NEXT_OFFERS_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
