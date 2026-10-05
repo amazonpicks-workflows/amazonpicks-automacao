@@ -75,12 +75,12 @@ jobs:
             exit 1
           fi
 
-      - name: Atualizar todo o universo monitorado pela Creators
+      - name: Atualizar preços, médias e caches em uma única rodada
         if: ${{ !inputs.validate_only }}
         working-directory: suplementos
         shell: bash
         run: |
-          if npx tsx scripts/z-UpdatePrices.ts --force --mode=full > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
+          if npx tsx scripts/z-UpdatePrices.ts --force --mode=full --with-price-stats > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
             echo "Etapa concluída com sucesso."
           else
             echo "Etapa falhou. Saída omitida para proteger os dados privados."
@@ -104,20 +104,3 @@ jobs:
           SCHEDULER_V2_ENABLED: "false"
           SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
           SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
-
-      - name: Recalcular médias e limpar retenção
-        if: ${{ !inputs.validate_only }}
-        working-directory: suplementos
-        shell: bash
-        run: |
-          if npm run refresh:dynamic:price-stats > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
-            echo "Etapa concluída com sucesso."
-          else
-            echo "Etapa falhou. Saída omitida para proteger os dados privados."
-            exit 1
-          fi
-        env:
-          DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
-          APP_BASE_URL: https://www.amazonpicks.com.br
-          INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
-          NEXT_OFFERS_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
