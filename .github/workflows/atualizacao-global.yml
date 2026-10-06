@@ -28,7 +28,7 @@ jobs:
         shell: bash
         env:
           SUPLEMENTOS_DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
-          SUPLEMENTOS_DEPLOY_KEY: ${{ secrets.SUPLEMENTOS_DEPLOY_KEY }}
+          SUPLEMENTOS_DEPLOY_KEY: ${{ secrets.AMAZONPICKS_DEPLOY_KEY }}
           SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
           SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
           SUPLEMENTOS_AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
@@ -42,9 +42,9 @@ jobs:
       - name: Baixar código do AmazonPicks
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: drlucashott-code/suplementos
+          repository: lucashott-code/amazonpicks
           ref: main
-          ssh-key: ${{ secrets.SUPLEMENTOS_DEPLOY_KEY }}
+          ssh-key: ${{ secrets.AMAZONPICKS_DEPLOY_KEY }}
           persist-credentials: false
           path: suplementos
 
