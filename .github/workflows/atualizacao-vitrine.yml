@@ -105,3 +105,12 @@ jobs:
           SCHEDULER_V2_ENABLED: "false"
           SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
           SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
+
+      - name: Preservar coleta somente se a rodada falhar
+        if: ${{ failure() && !inputs.validate_only }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: price-collection-${{ github.run_id }}
+          path: suplementos/tmp/global-price-collections/**/prices.jsonl
+          if-no-files-found: ignore
+          retention-days: 1
