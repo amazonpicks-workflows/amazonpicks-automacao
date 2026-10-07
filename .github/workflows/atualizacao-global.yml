@@ -34,8 +34,12 @@ jobs:
           SUPLEMENTOS_AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
           SUPLEMENTOS_AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
           SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          PUBLIC_FALLBACK_BUCKET: ${{ secrets.PUBLIC_FALLBACK_BUCKET }}
+          PUBLIC_FALLBACK_REGION: ${{ secrets.PUBLIC_FALLBACK_REGION }}
+          PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID: ${{ secrets.PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID }}
+          PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY: ${{ secrets.PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY }}
         run: |
-          for name in SUPLEMENTOS_DATABASE_URL SUPLEMENTOS_DEPLOY_KEY SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET SUPLEMENTOS_AMAZON_CREATORS_VERSION SUPLEMENTOS_AMAZON_PARTNER_TAG SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET; do
+          for name in SUPLEMENTOS_DATABASE_URL SUPLEMENTOS_DEPLOY_KEY SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET SUPLEMENTOS_AMAZON_CREATORS_VERSION SUPLEMENTOS_AMAZON_PARTNER_TAG SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET PUBLIC_FALLBACK_BUCKET PUBLIC_FALLBACK_REGION PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY; do
             if [ -z "${!name}" ]; then echo "Configuração ausente: $name"; exit 1; fi
           done
           echo "Configuração validada."
@@ -75,6 +79,22 @@ jobs:
             exit 1
           fi
 
+      - name: Validar armazenamento da cópia pública sem consultar a Neon
+        working-directory: suplementos
+        shell: bash
+        env:
+          PUBLIC_FALLBACK_BUCKET: ${{ secrets.PUBLIC_FALLBACK_BUCKET }}
+          PUBLIC_FALLBACK_REGION: ${{ secrets.PUBLIC_FALLBACK_REGION }}
+          PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID: ${{ secrets.PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID }}
+          PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY: ${{ secrets.PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY }}
+        run: |
+          if npx tsx scripts/validatePublicFallbackStorage.ts > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
+            echo "Armazenamento da contingência validado."
+          else
+            echo "Falha na validação do armazenamento."
+            exit 1
+          fi
+
       - name: Atualizar preços, médias e caches em uma única rodada
         if: ${{ !inputs.validate_only }}
         working-directory: suplementos
@@ -101,6 +121,10 @@ jobs:
           APP_BASE_URL: https://www.amazonpicks.com.br
           INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
           NEXT_OFFERS_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          PUBLIC_FALLBACK_BUCKET: ${{ secrets.PUBLIC_FALLBACK_BUCKET }}
+          PUBLIC_FALLBACK_REGION: ${{ secrets.PUBLIC_FALLBACK_REGION }}
+          PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID: ${{ secrets.PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID }}
+          PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY: ${{ secrets.PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY }}
           SCHEDULER_V2_ENABLED: "false"
           SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
           SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
