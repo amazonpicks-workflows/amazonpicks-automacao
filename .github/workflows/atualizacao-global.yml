@@ -104,6 +104,7 @@ jobs:
             echo "Etapa concluída com sucesso."
           else
             echo "Etapa falhou. Saída omitida para proteger os dados privados."
+            node scripts/lib/safeWorkflowDiagnostic.cjs "$RUNNER_TEMP/amazonpicks-task.log"
             exit 1
           fi
         env:
