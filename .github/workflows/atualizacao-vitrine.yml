@@ -1,7 +1,7 @@
 name: AmazonPicks — Atualização da vitrine
 
 on:
-  # O EventBridge mantém os disparos das 13h e 19h (horário de Brasília).
+  # O EventBridge mantém os disparos das 12h e 18h (horário de Brasília).
   # O caminho deste arquivo foi preservado para não alterar os alvos existentes.
   workflow_dispatch:
     inputs:
