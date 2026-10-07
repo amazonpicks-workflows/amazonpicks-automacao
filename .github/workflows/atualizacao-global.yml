@@ -1,7 +1,7 @@
 name: AmazonPicks — Atualização global
 
 on:
-  # Disparo externo diário às 7h (Brasília), administrado no EventBridge.
+  # Disparo externo diário às 6h (Brasília), administrado no EventBridge.
   workflow_dispatch:
     inputs:
       validate_only:
@@ -116,7 +116,8 @@ jobs:
           AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
           AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
           AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
-          AMAZON_GLOBAL_REQUEST_DELAY_MS: "800"
+          AMAZON_GLOBAL_REQUEST_DELAY_MS: "1000"
+          AMAZON_GLOBAL_OFFER_DB_BATCH_SIZE: "500"
           AMAZON_GLOBAL_DB_WRITE_CONCURRENCY: "4"
           APP_BASE_URL: https://www.amazonpicks.com.br
           INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
@@ -129,11 +130,5 @@ jobs:
           SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
           SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
 
-      - name: Preservar coleta somente se a rodada falhar
-        if: ${{ failure() && !inputs.validate_only }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: price-collection-${{ github.run_id }}
-          path: suplementos/tmp/global-price-collections/**/prices.jsonl
-          if-no-files-found: ignore
-          retention-days: 1
+      # Não publicar artefatos de coleta ou logs no repositório público.
+      # Diagnóstico detalhado deve ser executado somente no runner privado.
