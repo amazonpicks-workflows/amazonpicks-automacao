@@ -108,5 +108,11 @@ jobs:
           SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
           SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
 
+      - name: Publicar somente resumo sanitizado da rodada
+        if: ${{ always() && !inputs.validate_only }}
+        working-directory: suplementos
+        shell: bash
+        run: node scripts/lib/safeWorkflowDiagnostic.cjs "$RUNNER_TEMP/amazonpicks-task.log" --report
+
       # Não publicar artefatos de coleta ou logs no repositório público.
       # Diagnóstico detalhado deve ser executado somente no runner privado.
