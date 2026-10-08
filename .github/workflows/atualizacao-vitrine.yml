@@ -1,4 +1,4 @@
-name: AmazonPicks — Atualização prioritária
+name: AV
 on:
   workflow_dispatch:
     inputs:

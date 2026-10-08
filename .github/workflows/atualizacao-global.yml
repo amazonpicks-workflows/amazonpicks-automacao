@@ -1,4 +1,4 @@
-name: AmazonPicks — Atualização global
+name: AG
 on:
   workflow_dispatch:
     inputs:
