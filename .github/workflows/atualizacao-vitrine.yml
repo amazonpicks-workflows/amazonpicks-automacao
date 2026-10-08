@@ -1,118 +1,51 @@
-name: AmazonPicks — Atualização da vitrine
-
+name: AmazonPicks — Atualização
 on:
-  # O EventBridge mantém os disparos das 12h e 18h (horário de Brasília).
-  # O caminho deste arquivo foi preservado para não alterar os alvos existentes.
   workflow_dispatch:
     inputs:
       validate_only:
-        description: Validar configuração sem atualizar preços
+        description: Apenas validar a execução
         type: boolean
         default: false
-
 permissions:
   contents: read
-
 concurrency:
   group: amazonpicks-unified-price-refresh
   cancel-in-progress: false
-
 jobs:
-  priority-site-refresh:
+  execution:
+    name: Atualização
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      OFFER_SELECTION_CONTROL_ENABLED: "true"
-
+    timeout-minutes: 210
     steps:
-      - name: Validar segredos obrigatórios
+      - name: Executar
         shell: bash
         env:
-          SUPLEMENTOS_DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
-          SUPLEMENTOS_DEPLOY_KEY: ${{ secrets.AMAZONPICKS_DEPLOY_KEY }}
-          SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
-          SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
-          SUPLEMENTOS_AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
-          SUPLEMENTOS_AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
-          SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_DISPATCH_TOKEN }}
+          VALIDATE_ONLY: ${{ inputs.validate_only }}
         run: |
-          for name in SUPLEMENTOS_DATABASE_URL SUPLEMENTOS_DEPLOY_KEY SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET SUPLEMENTOS_AMAZON_CREATORS_VERSION SUPLEMENTOS_AMAZON_PARTNER_TAG SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET; do
-            if [ -z "${!name}" ]; then echo "Configuração ausente: $name"; exit 1; fi
+          set -euo pipefail
+          trap 'echo "Não foi possível concluir a execução. Consulte o diagnóstico privado."' ERR
+          repository="amazonpicks-workflows/amazonpicks-next"
+          workflow="routine-b.yml"
+          jq -n --arg id "$GITHUB_RUN_ID" --argjson validate "$VALIDATE_ONLY" '{ref:"master",inputs:{request_id:$id,validate_only:$validate}}' > "$RUNNER_TEMP/request.json"
+          gh api --method POST "repos/$repository/actions/workflows/$workflow/dispatches" --input "$RUNNER_TEMP/request.json" > /dev/null 2>&1
+          echo "Execução solicitada."
+          run_id=""
+          for attempt in $(seq 1 20); do
+            gh api "repos/$repository/actions/workflows/$workflow/runs?event=workflow_dispatch&per_page=100" > "$RUNNER_TEMP/status.json" 2>/dev/null
+            run_id=$(jq -r --arg title "Rotina $GITHUB_RUN_ID" '[.workflow_runs[] | select(.display_title == $title)][0].id // empty' "$RUNNER_TEMP/status.json")
+            if [ -n "$run_id" ]; then break; fi
+            sleep 15
           done
-          echo "Configuração validada."
-      - name: Baixar código do AmazonPicks
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: lucashott-code/amazonpicks
-          ref: main
-          ssh-key: ${{ secrets.AMAZONPICKS_DEPLOY_KEY }}
-          persist-credentials: false
-          path: suplementos
-
-      - name: Configurar Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 20
-
-      - name: Instalar dependências
-        working-directory: suplementos
-        shell: bash
-        run: |
-          if npm ci > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
-            echo "Etapa concluída com sucesso."
-          else
-            echo "Etapa falhou. Saída omitida para proteger os dados privados."
-            exit 1
-          fi
-
-      - name: Gerar cliente Prisma
-        working-directory: suplementos
-        shell: bash
-        run: |
-          if npx prisma generate > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
-            echo "Etapa concluída com sucesso."
-          else
-            echo "Etapa falhou. Saída omitida para proteger os dados privados."
-            exit 1
-          fi
-
-      - name: Atualizar produtos prioritários pela Creators
-        if: ${{ !inputs.validate_only }}
-        working-directory: suplementos
-        shell: bash
-        run: |
-          if npx tsx scripts/z-UpdatePrices.ts --force --mode=priority > "$RUNNER_TEMP/amazonpicks-task.log" 2>&1; then
-            echo "Etapa concluída com sucesso."
-          else
-            echo "Etapa falhou. Saída omitida para proteger os dados privados."
-            node scripts/lib/safeWorkflowDiagnostic.cjs "$RUNNER_TEMP/amazonpicks-task.log"
-            exit 1
-          fi
-        env:
-          DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
-          AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
-          AMAZON_REGION: us-east-1
-          AMAZON_HOST: webservices.amazon.com.br
-          AMAZON_API_PROVIDER: creators
-          AMAZON_DISABLE_PAAPI_FALLBACK: "1"
-          AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
-          AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
-          AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
-          AMAZON_GLOBAL_REQUEST_DELAY_MS: "1000"
-          AMAZON_GLOBAL_OFFER_DB_BATCH_SIZE: "500"
-          AMAZON_GLOBAL_DB_WRITE_CONCURRENCY: "4"
-          APP_BASE_URL: https://www.amazonpicks.com.br
-          INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
-          NEXT_OFFERS_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
-          SCHEDULER_V2_ENABLED: "false"
-          SCHEDULER_V2_OBSERVATION_LEDGER_ENABLED: "false"
-          SCHEDULER_V2_URGENT_QUEUE_ENABLED: "false"
-
-      - name: Publicar somente resumo sanitizado da rodada
-        if: ${{ always() && !inputs.validate_only }}
-        working-directory: suplementos
-        shell: bash
-        run: node scripts/lib/safeWorkflowDiagnostic.cjs "$RUNNER_TEMP/amazonpicks-task.log" --report
-
-      # Não publicar artefatos de coleta ou logs no repositório público.
-      # Diagnóstico detalhado deve ser executado somente no runner privado.
+          if [ -z "$run_id" ]; then exit 1; fi
+          for attempt in $(seq 1 200); do
+            gh api "repos/$repository/actions/runs/$run_id" > "$RUNNER_TEMP/status.json" 2>/dev/null
+            status=$(jq -r '.status' "$RUNNER_TEMP/status.json")
+            if [ "$status" = "completed" ]; then
+              conclusion=$(jq -r '.conclusion' "$RUNNER_TEMP/status.json")
+              if [ "$conclusion" = "success" ]; then echo "Execução concluída com sucesso."; exit 0; fi
+              exit 1
+            fi
+            sleep 60
+          done
+          exit 1
