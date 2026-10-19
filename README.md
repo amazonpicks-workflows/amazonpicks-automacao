@@ -24,5 +24,7 @@ testes de sucesso/falha e aprovação explícita do novo manifesto pela configur
 Arquivos novos são bloqueados até revisão; documentação neste README pode mudar.
 Nunca habilite debug ampliado nem adicione upload de artefatos/cache de código.
 
+A proteção de main exige que a política passe antes de integrar mudanças.
+
 Os nomes internos legados das regras AWS foram preservados. Seus horários efetivos
 são 09h, 15h e 21h UTC, equivalentes a 06h, 12h e 18h de Brasília.

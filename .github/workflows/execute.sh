@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-echo "POLICY_TEST_ONLY_NO_SECRET"
 set -euo pipefail
 set +x
 umask 077
