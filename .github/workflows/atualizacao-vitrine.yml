@@ -6,6 +6,10 @@ on:
         description: Apenas validar a execução
         type: boolean
         default: false
+      failure_probe:
+        description: Simular falha apenas na validação
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -14,38 +18,34 @@ concurrency:
 jobs:
   execution:
     name: Atualização
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 210
+    timeout-minutes: 180
     steps:
+      - name: Preparar execução
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Preparar ambiente
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
       - name: Executar
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.AUTOMATION_DISPATCH_TOKEN }}
+          ROUTINE: b
           VALIDATE_ONLY: ${{ inputs.validate_only }}
-        run: |
-          set -euo pipefail
-          trap 'echo "Não foi possível concluir a execução. Consulte o diagnóstico privado."' ERR
-          repository="amazonpicks-workflows/amazonpicks-next"
-          workflow="routine-b.yml"
-          jq -n --arg id "$GITHUB_RUN_ID" --argjson validate "$VALIDATE_ONLY" '{ref:"master",inputs:{request_id:$id,validate_only:$validate}}' > "$RUNNER_TEMP/request.json"
-          gh api --method POST "repos/$repository/actions/workflows/$workflow/dispatches" --input "$RUNNER_TEMP/request.json" > /dev/null 2>&1
-          echo "Execução solicitada."
-          run_id=""
-          for attempt in $(seq 1 20); do
-            gh api "repos/$repository/actions/workflows/$workflow/runs?event=workflow_dispatch&per_page=100" > "$RUNNER_TEMP/status.json" 2>/dev/null
-            run_id=$(jq -r --arg title "Rotina $GITHUB_RUN_ID" '[.workflow_runs[] | select(.display_title == $title)][0].id // empty' "$RUNNER_TEMP/status.json")
-            if [ -n "$run_id" ]; then break; fi
-            sleep 15
-          done
-          if [ -z "$run_id" ]; then exit 1; fi
-          for attempt in $(seq 1 200); do
-            gh api "repos/$repository/actions/runs/$run_id" > "$RUNNER_TEMP/status.json" 2>/dev/null
-            status=$(jq -r '.status' "$RUNNER_TEMP/status.json")
-            if [ "$status" = "completed" ]; then
-              conclusion=$(jq -r '.conclusion' "$RUNNER_TEMP/status.json")
-              if [ "$conclusion" = "success" ]; then echo "Execução concluída com sucesso."; exit 0; fi
-              exit 1
-            fi
-            sleep 60
-          done
-          exit 1
+          FAILURE_PROBE: ${{ inputs.failure_probe }}
+          SOURCE_KEY: ${{ secrets.AMAZONPICKS_DEPLOY_KEY }}
+          SOURCE_REPOSITORY: ${{ secrets.AUTOMATION_SOURCE_REPOSITORY }}
+          DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
+          AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
+          AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
+          AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
+          AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
+          INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
+          PUBLIC_FALLBACK_BUCKET: ${{ secrets.PUBLIC_FALLBACK_BUCKET }}
+          PUBLIC_FALLBACK_REGION: ${{ secrets.PUBLIC_FALLBACK_REGION }}
+          PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID: ${{ secrets.PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID }}
+          PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY: ${{ secrets.PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY }}
+        run: bash .github/workflows/execute.sh
