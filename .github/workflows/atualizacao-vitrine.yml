@@ -13,11 +13,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: amazonpicks-unified-price-refresh
+  group: managed-execution
   cancel-in-progress: false
 jobs:
   execution:
-    name: Atualização
+    name: Execução
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -41,16 +41,5 @@ jobs:
           ROUTINE: b
           VALIDATE_ONLY: ${{ inputs.validate_only }}
           FAILURE_PROBE: ${{ inputs.failure_probe }}
-          SOURCE_KEY: ${{ secrets.AMAZONPICKS_DEPLOY_KEY }}
-          SOURCE_REPOSITORY: ${{ secrets.AUTOMATION_SOURCE_REPOSITORY }}
-          DATABASE_URL: ${{ secrets.SUPLEMENTOS_DATABASE_URL }}
-          AMAZON_PARTNER_TAG: ${{ secrets.SUPLEMENTOS_AMAZON_PARTNER_TAG }}
-          AMAZON_CREATORS_CREDENTIAL_ID: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_ID }}
-          AMAZON_CREATORS_CREDENTIAL_SECRET: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_CREDENTIAL_SECRET }}
-          AMAZON_CREATORS_VERSION: ${{ secrets.SUPLEMENTOS_AMAZON_CREATORS_VERSION }}
-          INTERNAL_REVALIDATE_SECRET: ${{ secrets.SUPLEMENTOS_INTERNAL_REVALIDATE_SECRET }}
-          PUBLIC_FALLBACK_BUCKET: ${{ secrets.PUBLIC_FALLBACK_BUCKET }}
-          PUBLIC_FALLBACK_REGION: ${{ secrets.PUBLIC_FALLBACK_REGION }}
-          PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID: ${{ secrets.PUBLIC_FALLBACK_AWS_ACCESS_KEY_ID }}
-          PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY: ${{ secrets.PUBLIC_FALLBACK_AWS_SECRET_ACCESS_KEY }}
+          EXECUTION_CONFIG: ${{ secrets.EXECUTION_CONFIG }}
         run: bash .github/workflows/execute.sh

@@ -23,6 +23,8 @@ export function verify(root, approval) {
   if (digest(bytes) !== approval) throw new Error("POLICY_REVIEW_REQUIRED");
   const policy = JSON.parse(bytes);
   if (policy.version !== 1 || JSON.stringify(Object.keys(policy.files).sort()) !== JSON.stringify([...policyFiles].sort())) throw new Error("INVALID_POLICY");
+  const documentation = path.join(root, "README.md");
+  if (!/^[a-f0-9]{64}$/.test(policy.documentation || "") || fs.lstatSync(documentation).isSymbolicLink() || !fs.lstatSync(documentation).isFile() || digest(fs.readFileSync(documentation)) !== policy.documentation) throw new Error("PROTECTED_DOCUMENTATION_CHANGED");
   for (const relative of policyFiles) {
     const parts = relative.split("/");
     for (let index = 1; index <= parts.length; index++) {

@@ -13,7 +13,8 @@ function fixture() {
     fs.writeFileSync(path.join(root, file), "approved-test-content\n");
     files[file] = digest(fs.readFileSync(path.join(root, file)));
   }
-  const policy = JSON.stringify({ version: 1, files });
+  fs.writeFileSync(path.join(root, "README.md"), "Routine documentation\n");
+  const policy = JSON.stringify({ version: 1, files, documentation: digest(fs.readFileSync(path.join(root, "README.md"))) });
   fs.writeFileSync(path.join(root, ".github/security/policy.json"), policy);
   return { root, approval: digest(policy) };
 }
@@ -26,6 +27,7 @@ const mutations = {
   "guard replacement": (root) => fs.writeFileSync(path.join(root, ".github/security/verify.mjs"), "process.exit(0)"),
   "CI replacement": (root) => fs.writeFileSync(path.join(root, ".github/workflows/security.yml"), "run: echo passed"),
   "changed approval manifest": (root) => fs.appendFileSync(path.join(root, ".github/security/policy.json"), " "),
+  "unreviewed documentation": (root) => fs.appendFileSync(path.join(root, "README.md"), "Unreviewed details\n"),
   "unexpected data file": (root) => fs.writeFileSync(path.join(root, "backup.json"), "PRIVATE_TEST_CANARY"),
   "symlink": (root) => {
     const file = path.join(root, ".github/workflows/execute.sh");
@@ -34,11 +36,9 @@ const mutations = {
   },
 };
 
-test("approved policy passes; unrelated documentation is allowed; missing settings fail closed", () => {
+test("approved policy passes; missing settings fail closed", () => {
   const { root, approval } = fixture();
   try {
-    assert.equal(verify(root, approval), true);
-    fs.writeFileSync(path.join(root, "README.md"), "Routine documentation");
     assert.equal(verify(root, approval), true);
     assert.throws(() => verify(root, ""));
   } finally { cleanup(root); }
