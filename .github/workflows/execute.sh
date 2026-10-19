@@ -26,18 +26,22 @@ set +e
   [[ "${VALIDATE_ONLY:-}" == "true" || "${VALIDATE_ONLY:-}" == "false" ]]
   [[ "${ROUTINE:-}" == "a" || "${ROUTINE:-}" == "b" ]]
   [[ "${FAILURE_PROBE:-false}" != "true" || "$VALIDATE_ONLY" == "true" ]]
-  [[ -n "${SOURCE_KEY:-}" && -n "${SOURCE_REPOSITORY:-}" ]]
-  [[ "$SOURCE_REPOSITORY" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]
-  printf '%s\n' "$SOURCE_KEY" > "$private_root/key"
+  [[ -n "${EXECUTION_CONFIG:-}" ]]
+  printf '%s' "$EXECUTION_CONFIG" | jq -e 'type == "object" and .version == 1 and (.values | type == "object") and (keys | sort == ["key", "target", "values", "version"])' > /dev/null
+  target=$(printf '%s' "$EXECUTION_CONFIG" | jq -er '.target | select(type == "string" and length > 0)')
+  [[ "$target" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]
+  printf '%s' "$EXECUTION_CONFIG" | jq -er '.key | select(type == "string" and length > 0)' > "$private_root/key"
   curl --fail --silent --show-error --proto '=https' --tlsv1.2 https://api.github.com/meta |
     jq -er '.ssh_keys[] | "github.com " + .' > "$private_root/known_hosts"
   export GIT_SSH_COMMAND="ssh -i '$private_root/key' -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile='$private_root/known_hosts'"
   git init -q "$private_root/code"
-  git -C "$private_root/code" remote add origin "git@github.com:$SOURCE_REPOSITORY.git"
+  git -C "$private_root/code" remote add origin "git@github.com:$target.git"
   git -C "$private_root/code" fetch --quiet --depth=1 origin main
   git -C "$private_root/code" checkout --quiet --detach FETCH_HEAD
   rm -- "$private_root/key"
-  unset SOURCE_KEY SOURCE_REPOSITORY GIT_SSH_COMMAND
+  EXECUTION_CONFIG=$(printf '%s' "$EXECUTION_CONFIG" | jq -c 'del(.key, .target)')
+  export EXECUTION_CONFIG
+  unset target GIT_SSH_COMMAND
   export PRIVATE_BOOTSTRAP_LOG="$private_root/bootstrap.log"
   export PRIVATE_EXECUTION_LOG="$private_root/execution.log"
   cd "$private_root/code"
