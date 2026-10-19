@@ -30,6 +30,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20
+      # Security policy must pass before production credentials enter a step.
+      - name: Conferir proteção
+        env:
+          EXPECTED_POLICY_SHA256: ${{ vars.RUNNER_SECURITY_POLICY_SHA256 }}
+        run: node .github/security/verify.mjs .
       - name: Executar
         shell: bash
         env:

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "files": {
+    ".github/workflows/atualizacao-global.yml": "5936d6c28b9e478ff7e57c865dcaf1f1f8572ea8e71be6baf5887d3bc862df93",
+    ".github/workflows/atualizacao-vitrine.yml": "cbb1b1008f8e6755a8c6b322cb663028be04efa79c3035c415d48bce61c54fe4",
+    ".github/workflows/execute.sh": "3f1519564a127480b95c3e65b6a7ca5f359e93252f3a16f6e978c749c75c1207",
+    ".github/workflows/security.yml": "4d7af56a73784e3c06b8dd1a732fcf47d4639c643014c9b92ca8bb1b70576212",
+    ".github/security/verify.mjs": "697a53b8a0d9c717386a5830599dc4c5eebf5574e4c514170fe2ce87d47d0d90",
+    ".github/security/verify.test.mjs": "9832afa6d84a7807fb9b4eaca9f7270b1053c8d30a6a74bca43544764cead67a"
+  }
+}
