@@ -1,0 +1,32 @@
+name: Public runner security
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  policy:
+    name: Public runner security
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ler verificador da base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+          path: trusted
+      - name: Ler alteração como dados
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          path: candidate
+      - name: Conferir política
+        env:
+          EXPECTED_POLICY_SHA256: ${{ vars.RUNNER_SECURITY_POLICY_SHA256 }}
+        run: node trusted/.github/security/verify.mjs candidate
+      - name: Testar proteção
+        run: node --test trusted/.github/security/verify.test.mjs
